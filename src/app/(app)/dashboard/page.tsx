@@ -9,6 +9,11 @@ import { getProvider } from "@/lib/data/provider";
 import { getAIService, type AnalysisContext } from "@/lib/ai";
 import { bestTimeSummary } from "@/lib/utils";
 
+// Cache the rendered dashboard for 60s so the 9-account analysis isn't
+// recomputed on every request. Safe in demo (deterministic mock) and acceptable
+// for Supabase (data refreshes at most once per minute).
+export const revalidate = 60;
+
 export default async function DashboardPage() {
   const provider = getProvider();
   const portfolio = await provider.getPortfolio();
@@ -25,8 +30,20 @@ export default async function DashboardPage() {
     0,
   );
 
-  // Instagram as the "primary" account for AI summary + previews.
-  const ig = analyses.find((x) => x.a.platform === "instagram")!;
+  // Primary account for AI summary + previews. Prefer Instagram; fall back to
+  // the first available account so the dashboard never crashes on a portfolio
+  // that lacks Instagram (e.g. a real Supabase user with a different set).
+  const ig = analyses.find((x) => x.a.platform === "instagram") ?? analyses[0];
+  if (!ig) {
+    return (
+      <Card className="mt-10">
+        <CardTitle>Sin cuentas conectadas</CardTitle>
+        <p className="mt-3 text-[var(--muted)]">
+          Conectá al menos una red social para ver tu dashboard.
+        </p>
+      </Card>
+    );
+  }
   const ctx: AnalysisContext = {
     account: ig.analysis.account,
     audit: ig.analysis.audit,

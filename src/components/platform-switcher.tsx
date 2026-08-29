@@ -10,7 +10,6 @@ export function PlatformSwitcher({
   basePath,
 }: {
   basePath: string;
-  platform: string;
 }) {
   const pathname = usePathname();
   return (
@@ -22,14 +21,15 @@ export function PlatformSwitcher({
           <Link
             key={p}
             href={href}
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-[12px] border px-3 py-1.5 text-sm transition-colors",
+              "inline-flex items-center gap-1.5 rounded-[12px] border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50",
               active
                 ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
                 : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]",
             )}
           >
-            <PlatformIcon platform={p} size={18} />
+            <PlatformIcon platform={p} size={18} decorative />
             {PLATFORM_LABEL[p]}
           </Link>
         );

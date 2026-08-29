@@ -14,12 +14,14 @@ export class OpenAIService implements AIService {
   }
 
   private async complete(system: string, user: string): Promise<string> {
+    const key = this.key;
+    if (!key) return "";
     try {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          Authorization: `Bearer ${this.key!}`,
+          Authorization: `Bearer ${key}`,
         },
         body: JSON.stringify({
           model: MODEL,

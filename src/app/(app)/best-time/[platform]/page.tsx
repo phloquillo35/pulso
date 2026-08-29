@@ -23,7 +23,7 @@ export default async function BestTimePage({
 
   return (
     <div>
-      <PlatformSwitcher basePath="/best-time" platform={platform} />
+      <PlatformSwitcher basePath="/best-time" />
 
       <div className="mt-6 flex items-center gap-3">
         <PlatformIcon platform={platform} size={40} />

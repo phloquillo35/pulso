@@ -31,7 +31,7 @@ export default async function AuditPage({
 
   return (
     <div>
-      <PlatformSwitcher basePath="/audit" platform={platform} />
+      <PlatformSwitcher basePath="/audit" />
 
       <div className="mt-6 flex flex-wrap items-center gap-4">
         <PlatformIcon platform={platform} size={48} />

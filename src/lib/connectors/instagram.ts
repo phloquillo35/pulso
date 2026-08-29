@@ -1,5 +1,6 @@
 import type { Platform, SocialAccount } from "@/lib/types";
 import { BaseConnector } from "@/lib/connectors/base";
+import { resolveInstagramToken, isInstagramConfigured } from "@/lib/connectors/instagram-logic.mjs";
 
 // Instagram via Meta Graph API (Instagram Professional account).
 // Requires a Business/Creator account + Meta App Review for production.
@@ -12,14 +13,14 @@ import { BaseConnector } from "@/lib/connectors/base";
 //   GET /me/insights?metric=reach,impressions,engagement&period=day
 export class InstagramConnector extends BaseConnector {
   readonly platform: Platform = "instagram";
-  private token = process.env.IG_USER_TOKEN;
+  private token = resolveInstagramToken();
 
   constructor() {
     super("instagram");
   }
 
   isConfigured(): boolean {
-    return Boolean(this.token);
+    return isInstagramConfigured();
   }
 
   private headers() {

@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
 import { getProvider } from "@/lib/data/provider";
 import { getAIService, type AnalysisContext } from "@/lib/ai";
+import { parseChatRequest } from "@/lib/ai/chat-request.mjs";
 import { PLATFORMS, type Platform } from "@/lib/types";
 import { bestTimeSummary } from "@/lib/utils";
 
 export async function POST(req: Request) {
-  let body: { platform?: string; question?: string };
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  const { platform, question } = body;
-  if (!platform || !question || !PLATFORMS.includes(platform as Platform)) {
-    return NextResponse.json({ error: "Faltan platform o question" }, { status: 400 });
+
+  const parsed = parseChatRequest(body, PLATFORMS);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+  const { platform, question } = parsed;
 
   const analysis = await getProvider().analyze(platform as Platform);
   const ctx: AnalysisContext = {

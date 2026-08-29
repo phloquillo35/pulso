@@ -181,15 +181,17 @@ export class SupabaseDataProvider implements DataProvider {
         .eq("platform", platform)
         .maybeSingle();
       if (acc) {
-        const analysis = await this.buildFromDb(rowToAccount(acc));
+        const analysis = await this.buildFromDb(rowToAccount(acc), this.client);
         if (analysis) return analysis;
       }
     }
     return this.fallback.analyze(platform);
   }
 
-  private async buildFromDb(account: SocialAccount): Promise<AccountAnalysis | null> {
-    const client = this.client!;
+  private async buildFromDb(
+    account: SocialAccount,
+    client: SupabaseClient,
+  ): Promise<AccountAnalysis | null> {
     const [
       { data: posts },
       { data: daily },

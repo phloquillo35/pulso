@@ -1,8 +1,9 @@
 import type { AIService, AnalysisContext } from "@/lib/ai/types";
 import { buildContextPrompt } from "@/lib/ai/types";
 import { MockAIService } from "@/lib/ai/mock";
+import { resolveAnthropicModel } from "@/lib/ai/anthropic-logic.mjs";
 
-const MODEL = process.env.PULSO_ANTHROPIC_MODEL || "claude-sonnet-4-6";
+const MODEL = resolveAnthropicModel();
 
 export class AnthropicService implements AIService {
   readonly provider = "anthropic" as const;
@@ -14,12 +15,14 @@ export class AnthropicService implements AIService {
   }
 
   private async complete(system: string, user: string): Promise<string> {
+    const key = this.key;
+    if (!key) return "";
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-api-key": this.key!,
+          "x-api-key": key,
           "anthropic-version": "2023-07-01",
         },
         body: JSON.stringify({

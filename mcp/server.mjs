@@ -5,10 +5,10 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const PLATFORMS = ["instagram", "tiktok", "youtube", "x", "linkedin", "bluesky", "facebook", "threads", "twitch"];
+const PLATFORMS = ["instagram", "tiktok", "youtube", "x", "linkedin", "bluesky", "facebook", "threads", "pinterest"];
 const PLATFORM_LABEL = {
   instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube", x: "X",
-  linkedin: "LinkedIn", bluesky: "Bluesky", facebook: "Facebook", threads: "Threads", twitch: "Twitch",
+  linkedin: "LinkedIn", bluesky: "Bluesky", facebook: "Facebook", threads: "Threads", pinterest: "Pinterest",
 };
 
 const DEMO_ACCOUNTS = {
@@ -20,7 +20,7 @@ const DEMO_ACCOUNTS = {
   bluesky: { handle: "@marca.bsky.social", displayName: "Marca Demo", followers: 12300, avgEngagement: 0.047, postingFrequency: 14, growth30d: 11.3, baseHour: 18, peakDays: [2, 4, 5] },
   facebook: { handle: "marca", displayName: "Marca Demo", followers: 73800, avgEngagement: 0.028, postingFrequency: 9, growth30d: 2.4, baseHour: 15, peakDays: [3, 5, 6] },
   threads: { handle: "@marca", displayName: "Marca Demo", followers: 28900, avgEngagement: 0.051, postingFrequency: 16, growth30d: 8.9, baseHour: 19, peakDays: [2, 3, 4] },
-  twitch: { handle: "marca", displayName: "Marca Demo", followers: 19400, avgEngagement: 0.063, postingFrequency: 10, growth30d: 4.6, baseHour: 21, peakDays: [4, 5, 6] },
+  pinterest: { handle: "marca", displayName: "Marca Demo", followers: 41200, avgEngagement: 0.044, postingFrequency: 12, growth30d: 7.1, baseHour: 14, peakDays: [2, 4, 6] },
 };
 
 const COMPETITORS = {
@@ -49,8 +49,8 @@ const COMPETITORS = {
   threads: [
     { handle: "@rival-th", displayName: "Rival TH", followers: 41000, avgEngagementRate: 0.055, postingFrequency: 15, growth30d: 7.4 },
   ],
-  twitch: [
-    { handle: "rival-tw", displayName: "Rival TW", followers: 33000, avgEngagementRate: 0.068, postingFrequency: 9, growth30d: 3.8 },
+  pinterest: [
+    { handle: "rival-pin", displayName: "Rival PIN", followers: 67000, avgEngagementRate: 0.048, postingFrequency: 11, growth30d: 6.2 },
   ],
 };
 
@@ -198,21 +198,21 @@ if (isDirectRun) {
   startServer();
 }
 
-export { analyze, computeAudit, computeBestTimes, computeHashtags, toolResult, PLATFORMS, COMPETITORS };
+export { analyze, computeAudit, computeBestTimes, computeHashtags, toolResult, PLATFORMS, COMPETITORS, handle };
 
-function handle(msg) {
+function handle(msg, emit = send) {
   const id = msg.id;
   if (msg.method === "initialize") {
-    send({ jsonrpc: "2.0", id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "pulso", version: "0.1.0" } } });
+    emit({ jsonrpc: "2.0", id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "pulso", version: "0.1.0" } } });
   } else if (msg.method === "ping") {
-    send({ jsonrpc: "2.0", id, result: {} });
+    emit({ jsonrpc: "2.0", id, result: {} });
   } else if (msg.method === "tools/list") {
-    send({ jsonrpc: "2.0", id, result: { tools: TOOLS } });
+    emit({ jsonrpc: "2.0", id, result: { tools: TOOLS } });
   } else if (msg.method === "tools/call") {
     const { name, arguments: args } = msg.params || {};
     const platform = args?.platform;
     if (!PLATFORMS.includes(platform)) {
-      send({ jsonrpc: "2.0", id, error: { code: -32602, message: "platform inválido" } });
+      emit({ jsonrpc: "2.0", id, error: { code: -32602, message: "platform inválido" } });
       return;
     }
     let content;
@@ -221,12 +221,12 @@ function handle(msg) {
     else if (name === "pulso_hashtags") content = { hashtags: toolResult(platform).hashtags };
     else if (name === "pulso_competitors") content = { competitors: toolResult(platform).competitors };
     else if (name === "pulso_analyze") content = toolResult(platform);
-    else { send({ jsonrpc: "2.0", id, error: { code: -32601, message: "tool desconocido" } }); return; }
-    send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(content, null, 2) }] } });
+    else { emit({ jsonrpc: "2.0", id, error: { code: -32601, message: "tool desconocido" } }); return; }
+    emit({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(content, null, 2) }] } });
   } else if (msg.method === "notifications/initialized") {
     // no response
   } else {
-    send({ jsonrpc: "2.0", id, error: { code: -32601, message: `método desconocido: ${msg.method}` } });
+    emit({ jsonrpc: "2.0", id, error: { code: -32601, message: `método desconocido: ${msg.method}` } });
   }
 }
 

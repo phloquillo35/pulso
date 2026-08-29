@@ -35,7 +35,7 @@ export default async function AIPage({
 
   return (
     <div>
-      <PlatformSwitcher basePath="/ai" platform={platform} />
+      <PlatformSwitcher basePath="/ai" />
 
       <div className="mt-6 flex items-center gap-3">
         <PlatformIcon platform={platform} size={40} />

@@ -7,6 +7,7 @@ import {
   toolResult,
   PLATFORMS,
   COMPETITORS,
+  handle,
 } from "./server.mjs";
 import {
   parseFacetsToHashtags,
@@ -14,6 +15,12 @@ import {
   computeDailyMetricsFromPosts,
   computeHashtagStats as computeHashtagStatsBsky,
 } from "../src/lib/connectors/bluesky-logic.mjs";
+import {
+  resolveInstagramToken,
+  isInstagramConfigured,
+} from "../src/lib/connectors/instagram-logic.mjs";
+import { resolveAnthropicModel } from "../src/lib/ai/anthropic-logic.mjs";
+import { parseChatRequest, DEFAULT_CHAT_PLATFORM } from "../src/lib/ai/chat-request.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -158,6 +165,136 @@ check("bluesky: computeHashtagStats ordena por engagement desc", () => {
   assert.equal(stats[0].tag, "b");
   assert.equal(stats.find((s) => s.tag === "a").uses, 2);
   assert.ok(stats[0].avgEngagement >= stats[1].avgEngagement);
+});
+
+// ─── Instagram connector logic (B1) ───────────────────────────────────────
+check("instagram: isInstagramConfigured false sin token", () => {
+  assert.equal(isInstagramConfigured({}), false);
+  assert.equal(isInstagramConfigured({ IG_APP_ID: "x", IG_APP_SECRET: "y" }), false);
+});
+
+check("instagram: isInstagramConfigured true con IG_USER_TOKEN", () => {
+  assert.equal(isInstagramConfigured({ IG_USER_TOKEN: "tok_123" }), true);
+  // whitespace-only token is treated as unset
+  assert.equal(isInstagramConfigured({ IG_USER_TOKEN: "   " }), false);
+});
+
+check("instagram: resolveInstagramToken trimea", () => {
+  assert.equal(resolveInstagramToken({ IG_USER_TOKEN: "  tok  " }), "tok");
+  assert.equal(resolveInstagramToken({}), "");
+});
+
+// ─── Anthropic model resolution (B2) ─────────────────────────────────────
+check("anthropic: modelo default cuando no hay env", () => {
+  assert.equal(resolveAnthropicModel({}), "claude-sonnet-4-6");
+});
+
+check("anthropic: modelo desde PULSO_ANTHROPIC_MODEL", () => {
+  assert.equal(resolveAnthropicModel({ PULSO_ANTHROPIC_MODEL: "claude-3-5-sonnet" }), "claude-3-5-sonnet");
+});
+
+check("anthropic: fallback a default si el modelo es inválido", () => {
+  assert.equal(resolveAnthropicModel({ PULSO_ANTHROPIC_MODEL: "   " }), "claude-sonnet-4-6");
+  assert.equal(resolveAnthropicModel({ PULSO_ANTHROPIC_MODEL: "not a model!!" }), "claude-sonnet-4-6");
+});
+
+// ─── MCP protocol (B4) ───────────────────────────────────────────────────
+function callHandle(msg) {
+  const out = [];
+  handle(msg, (m) => out.push(m));
+  return out;
+}
+
+check("mcp: initialize responde protocolVersion + capabilities", () => {
+  const out = callHandle({ jsonrpc: "2.0", id: 1, method: "initialize" });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].jsonrpc, "2.0");
+  assert.equal(out[0].id, 1);
+  assert.equal(out[0].result.protocolVersion, "2024-11-05");
+  assert.ok(out[0].result.capabilities.tools);
+  assert.equal(out[0].result.serverInfo.name, "pulso");
+});
+
+check("mcp: ping responde {} ", () => {
+  const out = callHandle({ jsonrpc: "2.0", id: 2, method: "ping" });
+  assert.deepEqual(out[0].result, {});
+});
+
+check("mcp: tools/list expone los 5 tools", () => {
+  const out = callHandle({ jsonrpc: "2.0", id: 3, method: "tools/list" });
+  const tools = out[0].result.tools;
+  assert.equal(tools.length, 5);
+  const names = tools.map((t) => t.name);
+  for (const n of ["pulso_audit", "pulso_best_time", "pulso_hashtags", "pulso_competitors", "pulso_analyze"]) {
+    assert.ok(names.includes(n), `falta tool ${n}`);
+  }
+  // el enum de platform debe coincidir con la app (sin twitch, con pinterest)
+  assert.ok(!PLATFORMS.includes("twitch"), "twitch no debe estar");
+  assert.ok(PLATFORMS.includes("pinterest"), "pinterest debe estar");
+});
+
+check("mcp: tools/call pulso_audit devuelve audit", () => {
+  const out = callHandle({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "pulso_audit", arguments: { platform: "instagram" } } });
+  const content = JSON.parse(out[0].result.content[0].text);
+  assert.ok(content.audit.overall >= 0 && content.audit.overall <= 100);
+});
+
+check("mcp: tools/call con platform inválido → error -32602", () => {
+  const out = callHandle({ jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "pulso_audit", arguments: { platform: "twitch" } } });
+  assert.equal(out[0].error.code, -32602);
+});
+
+check("mcp: tools/call con tool desconocido → error -32601", () => {
+  const out = callHandle({ jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "no_existe", arguments: { platform: "instagram" } } });
+  assert.equal(out[0].error.code, -32601);
+});
+
+check("mcp: método desconocido → error -32601", () => {
+  const out = callHandle({ jsonrpc: "2.0", id: 7, method: "frobnicate" });
+  assert.equal(out[0].error.code, -32601);
+});
+
+// --- Chat request parser (POST /api/ai/chat) ---
+check("chat: acepta {platform, question} legacy", () => {
+  const r = parseChatRequest({ platform: "instagram", question: "hola" }, PLATFORMS);
+  assert.equal(r.ok, true);
+  assert.equal(r.platform, "instagram");
+  assert.equal(r.question, "hola");
+});
+
+check("chat: acepta {message} como alias de question", () => {
+  const r = parseChatRequest({ message: "  ¿cuándo posteo?  " }, PLATFORMS);
+  assert.equal(r.ok, true);
+  assert.equal(r.platform, DEFAULT_CHAT_PLATFORM);
+  assert.equal(r.question, "¿cuándo posteo?");
+});
+
+check("chat: platform omitido default instagram", () => {
+  const r = parseChatRequest({ question: "tip" }, PLATFORMS);
+  assert.equal(r.ok, true);
+  assert.equal(r.platform, "instagram");
+});
+
+check("chat: question vacío → error", () => {
+  const r = parseChatRequest({ question: "   " }, PLATFORMS);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /question|message/);
+});
+
+check("chat: sin question ni message → error", () => {
+  const r = parseChatRequest({ platform: "instagram" }, PLATFORMS);
+  assert.equal(r.ok, false);
+});
+
+check("chat: platform inválido → error", () => {
+  const r = parseChatRequest({ platform: "twitch", question: "hola" }, PLATFORMS);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /Platform/);
+});
+
+check("chat: body no-objeto (null/string) → error", () => {
+  assert.equal(parseChatRequest(null, PLATFORMS).ok, false);
+  assert.equal(parseChatRequest("hola", PLATFORMS).ok, false);
 });
 
 console.log(`\n${pass} pass · ${fail} fail`);

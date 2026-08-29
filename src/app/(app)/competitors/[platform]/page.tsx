@@ -19,6 +19,9 @@ export default async function CompetitorsPage({
   const provider = getProvider();
   const analysis = await provider.analyze(platform);
   const competitors = await provider.getCompetitors(platform);
+  const daily = analysis.daily;
+  const lastDaily = daily.at(-1);
+  const firstDaily30 = daily.at(-30);
   const me = {
     handle: analysis.account.handle,
     displayName: analysis.account.displayName,
@@ -27,11 +30,10 @@ export default async function CompetitorsPage({
       ? analysis.posts.reduce((s, x) => s + x.metrics.engagementRate, 0) / analysis.posts.length
       : 0,
     postingFrequency: new Set(analysis.posts.map((x) => x.publishedAt.slice(0, 10))).size,
-    growth30d: analysis.daily.length >= 30
-      ? ((analysis.daily.at(-1)!.followers - analysis.daily.at(-30)!.followers) /
-          (analysis.daily.at(-30)!.followers || 1)) *
-        100
-      : 0,
+    growth30d:
+      lastDaily && firstDaily30
+        ? ((lastDaily.followers - firstDaily30.followers) / (firstDaily30.followers || 1)) * 100
+        : 0,
     isMe: true,
   };
 
@@ -39,7 +41,7 @@ export default async function CompetitorsPage({
 
   return (
     <div>
-      <PlatformSwitcher basePath="/competitors" platform={platform} />
+      <PlatformSwitcher basePath="/competitors" />
 
       <div className="mt-6 flex items-center gap-3">
         <PlatformIcon platform={platform} size={40} />
@@ -81,7 +83,7 @@ export default async function CompetitorsPage({
                 </td>
                 <td
                   className={`border-t border-[var(--border)] py-3 text-right tabular-nums ${
-                    "text-[var(--success)]"
+                    r.growth30d >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
                   }`}
                 >
                   {formatDelta(r.growth30d)}

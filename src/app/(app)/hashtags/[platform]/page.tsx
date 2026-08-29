@@ -20,7 +20,7 @@ export default async function HashtagsPage({
 
   return (
     <div>
-      <PlatformSwitcher basePath="/hashtags" platform={platform} />
+      <PlatformSwitcher basePath="/hashtags" />
 
       <div className="mt-6 flex items-center gap-3">
         <PlatformIcon platform={platform} size={40} />
