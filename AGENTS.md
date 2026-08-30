@@ -1,18 +1,20 @@
 # AGENTS.md (Workflow Context) — pulso
-> Generado: 2026-08-29 20:55:54 · Herramienta: opencode · Proyecto: /Users/pablohernandezcanelo/Documents/pulso
+> Generado: 2026-08-29 21:24:05 · Herramienta: opencode · Proyecto: /Users/pablohernandezcanelo/Documents/pulso
 
 ## 🎯 Objetivo actual
-Pulso 100% funcional: audit+hardening+UX (loop maestro completo)
+Pulso iter2: instagram live, CSP, error boundaries, a11y, 38/38 tests, redirects 307
 
 ## 📍 Estado actual
   Branch: main · Working tree: SUCIO (1 archivos)
 
   Cambios sin commit:
-   AGENTS.md | 70 ++++-----------------------------------------------------------
-   1 file changed, 4 insertions(+), 66 deletions(-)
+   AGENTS.md | 80 ++-------------------------------------------------------------
+   1 file changed, 2 insertions(+), 78 deletions(-)
    M AGENTS.md
 
   Últimos commits:
+  a6c984f feat(iter2): instagram live metrics, CSP, error boundaries, a11y, loading/empty states
+  45f9022 docs: AGENTS.md handoff (estado 100% funcional)
   7bfc1b8 fix/feat: audit + hardening + UX (loop maestro)
   8df3507 feat: initial Pulso scaffold (Next16+React19+TS+Tailwind v4, AI layer, social connectors, Supabase, MCP server)
 
@@ -83,4 +85,4 @@ tsconfig.tsbuildinfo
     typecheck: npx tsc --noEmit
 
 ## 🧠 Decisiones tomadas
-    _(decisiones de diseño/acuerdo a registrar aquí)_
+      _(decisiones de diseño/acuerdo a registrar aquí)_
