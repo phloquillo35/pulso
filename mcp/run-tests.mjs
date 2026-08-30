@@ -394,6 +394,19 @@ check("chat: body no-objeto (null/string) → error", () => {
   assert.equal(parseChatRequest("hola", PLATFORMS).ok, false);
 });
 
+// ─── I4-1 regression: cold-start allowlist guard ───────────────────────────
+check("chat: allowlist vacío no 400ea el platform default (cold-start)", () => {
+  const r = parseChatRequest({ message: "x" }, []);
+  assert.equal(r.ok, true);
+  assert.equal(r.platform, DEFAULT_CHAT_PLATFORM);
+});
+
+check("chat: validación estricta preservada con allowlist poblado (tiktok inválido)", () => {
+  const r = parseChatRequest({ platform: "tiktok", message: "x" }, ["instagram"]);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /Platform/);
+});
+
 // ─── HTTP timeout helper (S3-2) ───────────────────────────────────────────
 // A controllable fake `fetch` so no real network I/O happens (a real fetch
 // would hang on DNS / abort timing and leave the top-level await unsettled).

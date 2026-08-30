@@ -11,6 +11,12 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
 
+  // Prevent open-redirect: only allow a local path (starts with "/" but not "//"
+  // and without a scheme like "https://"). Anything else falls back to /dashboard.
+  const isLocalRedirect =
+    next.startsWith("/") && !next.startsWith("//") && !next.includes("://");
+  const safeNext = isLocalRedirect ? next : "/dashboard";
+
   if (!isSupabaseEnabled() || !code) {
     return NextResponse.redirect(
       `${origin}/login?error=auth_callback_unavailable`,
@@ -25,7 +31,7 @@ export async function GET(request: Request) {
         `${origin}/login?error=${encodeURIComponent(error.message)}`,
       );
     }
-    return NextResponse.redirect(`${origin}${next}`);
+    return NextResponse.redirect(`${origin}${safeNext}`);
   } catch {
     return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
   }

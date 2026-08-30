@@ -24,7 +24,15 @@ export function parseChatRequest(body, platforms) {
   if (typeof question !== "string" || question.trim() === "") {
     return { ok: false, error: "Faltan question o message" };
   }
-  if (typeof platform !== "string" || !platforms.includes(platform)) {
+
+  // Cold-start guard: if the allowlist is missing/empty (e.g. a module-evaluation
+  // race on the first request after `next start`), fall back to a single-entry
+  // allowlist with the default platform so the endpoint never 400s because of a
+  // cold allowlist. When the allowlist is properly populated, strict validation is
+  // preserved (an unknown platform still errors).
+  const allowlist =
+    Array.isArray(platforms) && platforms.length > 0 ? platforms : [DEFAULT_CHAT_PLATFORM];
+  if (typeof platform !== "string" || !allowlist.includes(platform)) {
     return { ok: false, error: "Platform inválida" };
   }
   return { ok: true, platform, question: question.trim() };

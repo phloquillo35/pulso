@@ -26,8 +26,19 @@ export function ChatPanel({ platform }: { platform: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ platform, question: q }),
       });
-      const d = await res.json();
-      setMessages((m) => [...m, { role: "assistant", text: d.answer ?? "Sin respuesta." }]);
+      const d = await res.json().catch(() => null);
+      if (!res.ok) {
+        const text =
+          d && typeof d.error === "string" && d.error.trim()
+            ? d.error
+            : "No pude responder ahora, reintentá.";
+        setMessages((m) => [...m, { role: "assistant", text }]);
+        return;
+      }
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: (d && d.answer) || "No pude responder ahora, reintentá." },
+      ]);
     } catch {
       setMessages((m) => [...m, { role: "assistant", text: "Error de conexión." }]);
     } finally {
