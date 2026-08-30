@@ -5,6 +5,7 @@ import {
   computeHashtagStats,
   mapFeedToPosts,
 } from "./bluesky-logic.mjs";
+import { fetchWithTimeout } from "@/lib/http.mjs";
 
 // Bluesky via the open AT Protocol / public API (no app review required).
 // Uses an app password (BLUESKY_IDENTIFIER + BLUESKY_APP_PASSWORD).
@@ -26,7 +27,7 @@ export class BlueskyConnector extends BaseConnector {
 
   private async authenticate(): Promise<string | null> {
     try {
-      const res = await fetch(`${HOST}/com.atproto.server.createSession`, {
+      const res = await fetchWithTimeout(`${HOST}/com.atproto.server.createSession`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -47,7 +48,7 @@ export class BlueskyConnector extends BaseConnector {
     const jwt = await this.authenticate();
     if (!jwt) return super.getAccount();
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `${HOST}/app.bsky.actor.getProfile?actor=${encodeURIComponent(this.identifier!)}`,
         { headers: { Authorization: `Bearer ${jwt}` } },
       );
@@ -72,7 +73,7 @@ export class BlueskyConnector extends BaseConnector {
     const jwt = await this.authenticate();
     if (!jwt) return super.getPosts(accountId, limit);
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `${HOST}/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(
           this.identifier!,
         )}&limit=${Math.min(limit, 100)}`,

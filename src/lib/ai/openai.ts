@@ -1,6 +1,7 @@
 import type { AIService, AnalysisContext } from "@/lib/ai/types";
 import { buildContextPrompt } from "@/lib/ai/types";
 import { MockAIService } from "@/lib/ai/mock";
+import { fetchWithTimeout } from "@/lib/http.mjs";
 
 const MODEL = process.env.PULSO_OPENAI_MODEL || "gpt-4o";
 
@@ -17,7 +18,7 @@ export class OpenAIService implements AIService {
     const key = this.key;
     if (!key) return "";
     try {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "content-type": "application/json",

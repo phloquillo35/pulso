@@ -9,13 +9,21 @@ import next from "@next/eslint-plugin-next";
 // FlatCompat bridge). mcp/ is plain Node ESM run by `npm test`, so it's ignored.
 export default [
   { ignores: [".next/**", "node_modules/**", "mcp/**", "supabase/**"] },
-  // Plain Node ESM modules (e.g. *-logic.mjs) may read process.env; treat them
-  // as Node so `process` is a known global and sourceType is module.
+  // Plain Node ESM modules (e.g. *-logic.mjs, http.mjs, next.config.mjs) run
+  // under Node and may use process, fetch, AbortSignal and URL. Treat them as
+  // Node so those globals are known and sourceType is module.
   {
     files: ["**/*.mjs"],
     languageOptions: {
       sourceType: "module",
-      globals: { process: "readonly", console: "readonly" },
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        AbortSignal: "readonly",
+        URL: "readonly",
+        setTimeout: "readonly",
+      },
     },
   },
   js.configs.recommended,

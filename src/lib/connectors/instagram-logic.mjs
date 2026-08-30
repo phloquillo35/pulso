@@ -85,10 +85,11 @@ export async function fetchInstagramDailyMetrics(fetchImpl, token, days = 90) {
   if (!token) return null;
   try {
     const since = Math.floor((Date.now() - days * 86400000) / 1000);
+    // Token is sent ONLY via the Authorization: Bearer header (see headers
+    // below) — never in the query string, to avoid leaking it in server logs.
     const url =
       "https://graph.instagram.com/me/insights" +
-      `?metric=reach,impressions,engagement&period=day&since=${since}` +
-      `&access_token=${token}`;
+      `?metric=reach,impressions,engagement&period=day&since=${since}`;
     const res = await fetchImpl(url, {
       headers: { Authorization: `Bearer ${token}` },
     });

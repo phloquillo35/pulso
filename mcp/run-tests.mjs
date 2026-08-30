@@ -23,6 +23,8 @@ import {
 } from "../src/lib/connectors/instagram-logic.mjs";
 import { resolveAnthropicModel } from "../src/lib/ai/anthropic-logic.mjs";
 import { parseChatRequest, DEFAULT_CHAT_PLATFORM } from "../src/lib/ai/chat-request.mjs";
+import { fetchWithTimeout } from "../src/lib/http.mjs";
+import { asPlatform } from "../src/lib/data/platform.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -390,6 +392,81 @@ check("chat: platform inválido → error", () => {
 check("chat: body no-objeto (null/string) → error", () => {
   assert.equal(parseChatRequest(null, PLATFORMS).ok, false);
   assert.equal(parseChatRequest("hola", PLATFORMS).ok, false);
+});
+
+// ─── HTTP timeout helper (S3-2) ───────────────────────────────────────────
+// A controllable fake `fetch` so no real network I/O happens (a real fetch
+// would hang on DNS / abort timing and leave the top-level await unsettled).
+function makeFakeFetch(behavior) {
+  return async (_input, init) => behavior(init?.signal);
+}
+
+function abortError() {
+  const e = new Error("The operation was aborted");
+  e.name = "AbortError";
+  return e;
+}
+
+check("http: fetchWithTimeout propaga el rechazo del fetch", async () => {
+  const orig = global.fetch;
+  global.fetch = makeFakeFetch(() => Promise.reject(abortError()));
+  try {
+    await assert.rejects(
+      () => fetchWithTimeout("http://pulso.test/x", {}, 10),
+      (e) => e.name === "TimeoutError" || e.name === "AbortError",
+    );
+  } finally {
+    global.fetch = orig;
+  }
+});
+
+check("http: fetchWithTimeout respeta signal existente", async () => {
+  const orig = global.fetch;
+  let seenSignal = null;
+  global.fetch = makeFakeFetch((sig) => {
+    seenSignal = sig ?? null;
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
+  try {
+    const ac = new AbortController();
+    await fetchWithTimeout("http://pulso.test/y", { signal: ac.signal }, 5000);
+    assert.equal(seenSignal, ac.signal);
+  } finally {
+    global.fetch = orig;
+  }
+});
+
+check("instagram: fetchWithTimeout hace fallback a null en abort (S3-2)", async () => {
+  const orig = global.fetch;
+  global.fetch = makeFakeFetch(() => Promise.reject(abortError()));
+  try {
+    const res = await fetchInstagramDailyMetrics(fetchWithTimeout, "tok_123", 90);
+    assert.equal(res, null);
+  } finally {
+    global.fetch = orig;
+  }
+});
+
+// ─── asPlatform explicit (S3-7) ───────────────────────────────────────────
+check("platform: asPlatform lanza con valor inválido (no enmascara)", () => {
+  assert.throws(() => asPlatform("plataforma_inexistente"));
+  assert.throws(() => asPlatform("twitch"));
+  assert.equal(asPlatform("instagram"), "instagram");
+  assert.equal(asPlatform("bluesky"), "bluesky");
+});
+
+// ─── MCP hardening (S3-8) ─────────────────────────────────────────────────
+check("mcp: notificaciones no reciben respuesta", () => {
+  assert.equal(callHandle({ jsonrpc: "2.0", method: "notifications/initialized" }).length, 0);
+  assert.equal(callHandle({ jsonrpc: "2.0", method: "notifications/foo" }).length, 0);
+  // un request con id (ping) SÍ debe responder
+  assert.equal(callHandle({ jsonrpc: "2.0", id: 99, method: "ping" }).length, 1);
+});
+
+check("mcp: grado siempre A-D (sin E)", () => {
+  for (const p of PLATFORMS) {
+    assert.match(analyze(p).audit.grade, /^[A-D]$/);
+  }
 });
 
 await Promise.all(checks);

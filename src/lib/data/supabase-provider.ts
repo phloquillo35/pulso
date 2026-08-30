@@ -20,13 +20,101 @@ import { computeAudit } from "@/lib/analytics/audit";
 import { detectInsights } from "@/lib/analytics/insights";
 import { computeBestTimesFromPosts } from "@/lib/connectors/mock";
 import { PLATFORMS } from "@/lib/types";
+import { asPlatform } from "@/lib/data/platform.mjs";
 
-// ─── Row → domain mappers (snake_case DB → camelCase domain) ──────────────
-function asPlatform(value: string): Platform {
-  return (PLATFORMS as string[]).includes(value) ? (value as Platform) : "bluesky";
+// ─── DB row shapes (snake_case, mirror of supabase/migrations/0001_init.sql) ─
+// Typed so a column rename in the migration is caught at compile time instead
+// of silently producing `undefined` at runtime.
+interface DbAccount {
+  id: string;
+  user_id: string;
+  platform: string;
+  handle: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  followers: number;
+  following: number | null;
+  bio: string | null;
+  category: string | null;
+  connected: boolean;
+  last_synced_at: string | null;
 }
 
-function rowToAccount(r: any): SocialAccount {
+interface DbPost {
+  id: string;
+  account_id: string;
+  platform: string;
+  caption: string | null;
+  media_type: string | null;
+  published_at: string;
+  hashtags: string[];
+  metrics: {
+    likes?: number;
+    comments?: number;
+    shares?: number;
+    saves?: number;
+    views?: number;
+    reach?: number;
+    impressions?: number;
+    clicks?: number;
+    engagementRate?: number;
+  } | null;
+  url: string | null;
+}
+
+interface DbDailyMetric {
+  date: string;
+  followers: number;
+  engagement: number;
+  reach: number;
+  impressions: number;
+  new_followers: number;
+  unfollows: number;
+}
+
+interface DbHashtagStat {
+  id: string;
+  account_id: string;
+  tag: string;
+  uses: number;
+  total_likes: number;
+  avg_engagement: number;
+  reach: number;
+}
+
+interface DbAuditScore {
+  id: string;
+  account_id: string;
+  overall: number;
+  breakdown: Record<string, number>;
+  grade: string;
+  recommendations: string[];
+}
+
+interface DbInsight {
+  id: string;
+  account_id: string;
+  kind: string;
+  title: string;
+  detail: string;
+  severity: string;
+  created_at: string;
+}
+
+interface DbCompetitor {
+  id: string;
+  user_id: string;
+  platform: string;
+  handle: string;
+  display_name: string | null;
+  followers: number;
+  avg_engagement_rate: number;
+  posting_frequency: number;
+  growth_30d: number;
+}
+
+// ─── Row → domain mappers (snake_case DB → camelCase domain) ──────────────
+function rowToAccount(r: DbAccount): SocialAccount {
   return {
     id: r.id,
     platform: asPlatform(r.platform),
@@ -42,8 +130,8 @@ function rowToAccount(r: any): SocialAccount {
   };
 }
 
-function rowToPost(r: any): Post {
-  const media = ["image", "video", "carousel", "text", "reel"].includes(r.media_type)
+function rowToPost(r: DbPost): Post {
+  const media = ["image", "video", "carousel", "text", "reel"].includes(r.media_type ?? "")
     ? (r.media_type as MediaType)
     : "text";
   const m = r.metrics ?? {};
@@ -70,7 +158,7 @@ function rowToPost(r: any): Post {
   };
 }
 
-function rowToDaily(r: any): DailyMetric {
+function rowToDaily(r: DbDailyMetric): DailyMetric {
   return {
     date: r.date,
     followers: r.followers ?? 0,
@@ -82,7 +170,7 @@ function rowToDaily(r: any): DailyMetric {
   };
 }
 
-function rowToHashtag(r: any): HashtagStat {
+function rowToHashtag(r: DbHashtagStat): HashtagStat {
   return {
     tag: r.tag,
     uses: r.uses ?? 0,
@@ -92,28 +180,28 @@ function rowToHashtag(r: any): HashtagStat {
   };
 }
 
-function rowToAudit(r: any, accountId: string): AuditScore {
+function rowToAudit(r: DbAuditScore, accountId: string): AuditScore {
   return {
     accountId,
     overall: r.overall ?? 0,
-    breakdown: r.breakdown ?? {},
-    grade: r.grade ?? "C",
+    breakdown: (r.breakdown ?? {}) as AuditScore["breakdown"],
+    grade: (r.grade ?? "C") as AuditScore["grade"],
     recommendations: Array.isArray(r.recommendations) ? r.recommendations : [],
   };
 }
 
-function rowToInsight(r: any): Insight {
+function rowToInsight(r: DbInsight): Insight {
   return {
     id: r.id,
-    kind: r.kind,
+    kind: r.kind as Insight["kind"],
     title: r.title,
     detail: r.detail,
-    severity: r.severity ?? "info",
+    severity: r.severity as Insight["severity"],
     createdAt: r.created_at ?? new Date().toISOString(),
   };
 }
 
-function rowToCompetitor(r: any): Competitor {
+function rowToCompetitor(r: DbCompetitor): Competitor {
   return {
     id: r.id,
     platform: asPlatform(r.platform),
@@ -168,7 +256,10 @@ export class SupabaseDataProvider implements DataProvider {
       .select("*")
       .eq("user_id", this.userId);
     if (error || !data || data.length === 0) return this.fallback.getPortfolio();
-    return data.map(rowToAccount);
+    // Omit rows with a corrupt platform instead of masking them as "bluesky".
+    return data
+      .filter((r) => (PLATFORMS as string[]).includes(r.platform))
+      .map(rowToAccount);
   }
 
   async analyze(platform: Platform): Promise<AccountAnalysis> {
@@ -180,7 +271,7 @@ export class SupabaseDataProvider implements DataProvider {
         .eq("user_id", this.userId)
         .eq("platform", platform)
         .maybeSingle();
-      if (acc) {
+      if (acc && (PLATFORMS as string[]).includes(acc.platform)) {
         const analysis = await this.buildFromDb(rowToAccount(acc), this.client);
         if (analysis) return analysis;
       }
@@ -224,8 +315,8 @@ export class SupabaseDataProvider implements DataProvider {
         .order("created_at", { ascending: false }),
     ]);
 
-    const postRows = (posts ?? []) as any[];
-    const dailyRows = (daily ?? []) as any[];
+    const postRows = (posts ?? []) as DbPost[];
+    const dailyRows = (daily ?? []) as DbDailyMetric[];
     // Nothing synced for this account yet → fall back to demo analysis.
     if (postRows.length === 0 && dailyRows.length === 0) return null;
 
@@ -235,11 +326,11 @@ export class SupabaseDataProvider implements DataProvider {
     const bestTimes: BestTimeCell[] = computeBestTimesFromPosts(mappedPosts);
     const audit =
       audits && audits[0]
-        ? rowToAudit(audits[0], account.id)
+        ? rowToAudit(audits[0] as DbAuditScore, account.id)
         : computeAudit(account, mappedDaily, mappedPosts);
     const mappedInsights =
       insights && insights.length
-        ? (insights as any[]).map(rowToInsight)
+        ? (insights as DbInsight[]).map(rowToInsight)
         : detectInsights(account, mappedDaily, mappedPosts, bestTimes);
 
     return {
@@ -263,6 +354,9 @@ export class SupabaseDataProvider implements DataProvider {
       .eq("user_id", this.userId)
       .eq("platform", platform);
     if (error || !data || data.length === 0) return this.fallback.getCompetitors(platform);
-    return data.map(rowToCompetitor);
+    // Omit rows with a corrupt platform instead of masking them as "bluesky".
+    return data
+      .filter((r) => (PLATFORMS as string[]).includes(r.platform))
+      .map(rowToCompetitor);
   }
 }

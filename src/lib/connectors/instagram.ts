@@ -1,6 +1,7 @@
 import type { Platform, SocialAccount } from "@/lib/types";
 import { BaseConnector } from "@/lib/connectors/base";
 import { resolveInstagramToken, isInstagramConfigured, fetchInstagramDailyMetrics } from "@/lib/connectors/instagram-logic.mjs";
+import { fetchWithTimeout } from "@/lib/http.mjs";
 
 // Instagram via Meta Graph API (Instagram Professional account).
 // Requires a Business/Creator account + Meta App Review for production.
@@ -30,8 +31,8 @@ export class InstagramConnector extends BaseConnector {
   async getAccount(): Promise<SocialAccount> {
     if (!this.isConfigured()) return super.getAccount();
     try {
-      const res = await fetch(
-        `https://graph.instagram.com/me?fields=id,username,biography,followers_count,media_count&access_token=${this.token}`,
+      const res = await fetchWithTimeout(
+        `https://graph.instagram.com/me?fields=id,username,biography,followers_count,media_count`,
         { headers: this.headers() },
       );
       if (!res.ok) throw new Error(`IG ${res.status}`);
@@ -54,7 +55,7 @@ export class InstagramConnector extends BaseConnector {
     // Live path: fetch real insights from the Graph API and normalize them
     // into DailyMetric[]. Any failure (no token, network error, malformed
     // payload) returns null → fall back to the mock so the UI stays populated.
-    const live = await fetchInstagramDailyMetrics(fetch, this.token, days);
+    const live = await fetchInstagramDailyMetrics(fetchWithTimeout, this.token, days);
     return live ?? super.getDailyMetrics(accountId, days);
   }
 }

@@ -2,6 +2,7 @@ import type { AIService, AnalysisContext } from "@/lib/ai/types";
 import { buildContextPrompt } from "@/lib/ai/types";
 import { MockAIService } from "@/lib/ai/mock";
 import { resolveAnthropicModel } from "@/lib/ai/anthropic-logic.mjs";
+import { fetchWithTimeout } from "@/lib/http.mjs";
 
 const MODEL = resolveAnthropicModel();
 
@@ -18,7 +19,7 @@ export class AnthropicService implements AIService {
     const key = this.key;
     if (!key) return "";
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "content-type": "application/json",

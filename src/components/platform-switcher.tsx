@@ -23,7 +23,7 @@ export function PlatformSwitcher({
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-[12px] border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50",
+              "inline-flex items-center gap-1.5 rounded-[12px] border px-3 py-1.5 text-sm transition-colors",
               active
                 ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
                 : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)]",

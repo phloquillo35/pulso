@@ -107,7 +107,8 @@ function computeAudit(posts, acc) {
   const contentQuality = clamp(Math.round((posts.filter((p) => p.mediaType === "video").length / posts.length) * 120), 30, 99);
   const audienceHealth = clamp(Math.round((acc.followers > 50000 ? 80 : 65) + (acc.growth30d > 5 ? 10 : 0)), 30, 99);
   const overall = Math.round((growth + engagement + consistency + contentQuality + audienceHealth) / 5);
-  const grade = overall >= 85 ? "A" : overall >= 70 ? "B" : overall >= 55 ? "C" : overall >= 40 ? "D" : "E";
+  // Grade is clamped to A–D to match the app's AuditGrade type (no "E").
+  const grade = overall >= 85 ? "A" : overall >= 70 ? "B" : overall >= 55 ? "C" : "D";
   const recommendations = [
     `Publicá en tus días pico (${acc.peakDays.map((d) => ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"][d]).join(", ")}) cerca de las ${acc.baseHour}:00.`,
     `Subí el engagement usando más videos (hoy ${(posts.filter((p) => p.mediaType === "video").length / posts.length * 100).toFixed(0)}% del mix).`,
@@ -202,6 +203,15 @@ export { analyze, computeAudit, computeBestTimes, computeHashtags, toolResult, P
 
 function handle(msg, emit = send) {
   const id = msg.id;
+  // JSON-RPC 2.0: notifications (no `id`, or any method in the `notifications/`
+  // namespace) MUST NOT receive a response. Only respond to requests that carry
+  // an id. This prevents the server from emitting error noise for client
+  // notifications like `notifications/initialized`.
+  const isNotification =
+    id === undefined ||
+    (typeof msg.method === "string" && msg.method.startsWith("notifications/"));
+  if (isNotification) return;
+
   if (msg.method === "initialize") {
     emit({ jsonrpc: "2.0", id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "pulso", version: "0.1.0" } } });
   } else if (msg.method === "ping") {
@@ -223,12 +233,7 @@ function handle(msg, emit = send) {
     else if (name === "pulso_analyze") content = toolResult(platform);
     else { emit({ jsonrpc: "2.0", id, error: { code: -32601, message: "tool desconocido" } }); return; }
     emit({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(content, null, 2) }] } });
-  } else if (msg.method === "notifications/initialized") {
-    // no response
   } else {
     emit({ jsonrpc: "2.0", id, error: { code: -32601, message: `método desconocido: ${msg.method}` } });
   }
 }
-
-// Keep stdin open
-process.stdin.resume();

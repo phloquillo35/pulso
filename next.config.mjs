@@ -15,6 +15,26 @@ const nextConfig = {
     const scriptSrc = isProd
       ? "script-src 'self' 'unsafe-inline'"
       : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+
+    // When Supabase is configured (production), allow the browser client
+    // (@supabase/ssr) to call the project API and load Storage avatars.
+    // In demo (no env) this stays null and the CSP is unchanged.
+    let supabaseOrigin = null;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (supabaseUrl) {
+      try {
+        supabaseOrigin = new URL(supabaseUrl).origin;
+      } catch {
+        supabaseOrigin = null;
+      }
+    }
+    const connectSrc = supabaseOrigin
+      ? `connect-src 'self' ${supabaseOrigin}`
+      : "connect-src 'self'";
+    const imgSrc = supabaseOrigin
+      ? `img-src 'self' data: blob: ${supabaseOrigin}`
+      : "img-src 'self' data: blob:";
+
     return [
       {
         source: "/:path*",
@@ -25,9 +45,9 @@ const nextConfig = {
               "default-src 'self'",
               scriptSrc,
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              imgSrc,
               "font-src 'self' data:",
-              "connect-src 'self'",
+              connectSrc,
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

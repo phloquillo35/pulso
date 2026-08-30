@@ -105,7 +105,7 @@ export function LoginForm({ redirectTo = "/dashboard" }: { redirectTo?: string }
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="vos@ejemplo.com"
-            className="mt-1 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--fg)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50"
+            className="mt-1 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--fg)] outline-none"
           />
         </div>
         <div>
@@ -117,7 +117,7 @@ export function LoginForm({ redirectTo = "/dashboard" }: { redirectTo?: string }
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="mt-1 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--fg)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50"
+            className="mt-1 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--fg)] outline-none"
           />
         </div>
 

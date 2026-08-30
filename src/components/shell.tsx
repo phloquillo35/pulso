@@ -39,7 +39,7 @@ export function Shell({
     <div className="min-h-screen">
       <a
         href="#contenido"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[100] focus:rounded-[10px] focus:bg-[var(--accent)] focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-[var(--accent-fg)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[100] focus:rounded-[10px] focus:bg-[var(--accent)] focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-[var(--accent-fg)]"
       >
         Saltar al contenido
       </a>
@@ -47,7 +47,7 @@ export function Shell({
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-5">
           <Link
             href="/"
-            className="flex items-center gap-2 rounded-[10px] font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50"
+            className="flex items-center gap-2 rounded-[10px] font-semibold tracking-tight"
           >
             <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-[var(--accent)] text-sm text-white">
               P
@@ -60,7 +60,7 @@ export function Shell({
               href="/dashboard"
               aria-current={pathname === "/dashboard" ? "page" : undefined}
               className={cn(
-                "rounded-[10px] px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50",
+                "rounded-[10px] px-3 py-1.5 text-sm transition-colors",
                 pathname === "/dashboard"
                   ? "bg-[var(--surface-2)] text-[var(--fg)]"
                   : "text-[var(--muted)] hover:text-[var(--fg)]",
@@ -77,7 +77,7 @@ export function Shell({
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "rounded-[10px] px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50",
+                    "rounded-[10px] px-3 py-1.5 text-sm transition-colors",
                     active
                       ? "bg-[var(--surface-2)] text-[var(--fg)]"
                       : "text-[var(--muted)] hover:text-[var(--fg)]",

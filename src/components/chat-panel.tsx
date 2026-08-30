@@ -64,7 +64,7 @@ export function ChatPanel({ platform }: { platform: string }) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder="Escribí tu pregunta…"
-          className="flex-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50"
+          className="flex-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2.5 text-sm outline-none"
         />
         <button onClick={send} disabled={loading} className={buttonClasses("primary", "md")}>
           Enviar
