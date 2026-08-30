@@ -1,6 +1,6 @@
 import type { Platform, SocialAccount } from "@/lib/types";
 import { BaseConnector } from "@/lib/connectors/base";
-import { resolveInstagramToken, isInstagramConfigured } from "@/lib/connectors/instagram-logic.mjs";
+import { resolveInstagramToken, isInstagramConfigured, fetchInstagramDailyMetrics } from "@/lib/connectors/instagram-logic.mjs";
 
 // Instagram via Meta Graph API (Instagram Professional account).
 // Requires a Business/Creator account + Meta App Review for production.
@@ -51,19 +51,10 @@ export class InstagramConnector extends BaseConnector {
 
   async getDailyMetrics(accountId: string, days = 90) {
     if (!this.isConfigured()) return super.getDailyMetrics(accountId, days);
-    try {
-      const since = Math.floor((Date.now() - days * 86400000) / 1000);
-      const res = await fetch(
-        `https://graph.instagram.com/me/insights?metric=reach,impressions,engagement&period=day&since=${since}&access_token=${this.token}`,
-        { headers: this.headers() },
-      );
-      if (!res.ok) throw new Error(`IG insights ${res.status}`);
-      // NOTE: production should normalize the paginated insight arrays into
-      // DailyMetric[]. Until the OAuth + token-refresh pipeline is wired,
-      // we fall back to mock to keep the dashboard honest.
-      return super.getDailyMetrics(accountId, days);
-    } catch {
-      return super.getDailyMetrics(accountId, days);
-    }
+    // Live path: fetch real insights from the Graph API and normalize them
+    // into DailyMetric[]. Any failure (no token, network error, malformed
+    // payload) returns null → fall back to the mock so the UI stays populated.
+    const live = await fetchInstagramDailyMetrics(fetch, this.token, days);
+    return live ?? super.getDailyMetrics(accountId, days);
   }
 }

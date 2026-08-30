@@ -19,18 +19,28 @@ export async function POST(req: Request) {
   }
   const { platform, question } = parsed;
 
-  const analysis = await getProvider().analyze(platform as Platform);
-  const ctx: AnalysisContext = {
-    account: analysis.account,
-    audit: analysis.audit,
-    recentPosts: analysis.posts.slice(0, 5).map((x) => ({
-      caption: x.caption,
-      engagementRate: x.metrics.engagementRate,
-      mediaType: x.mediaType,
-    })),
-    topHashtags: analysis.hashtags.slice(0, 5).map((h) => ({ tag: h.tag, avgEngagement: h.avgEngagement })),
-    bestTimeSummary: bestTimeSummary(analysis.bestTimes),
-  };
-  const answer = await getAIService().chat(question, ctx);
-  return NextResponse.json({ answer });
+  try {
+    const analysis = await getProvider().analyze(platform as Platform);
+    const ctx: AnalysisContext = {
+      account: analysis.account,
+      audit: analysis.audit,
+      recentPosts: analysis.posts.slice(0, 5).map((x) => ({
+        caption: x.caption,
+        engagementRate: x.metrics.engagementRate,
+        mediaType: x.mediaType,
+      })),
+      topHashtags: analysis.hashtags.slice(0, 5).map((h) => ({ tag: h.tag, avgEngagement: h.avgEngagement })),
+      bestTimeSummary: bestTimeSummary(analysis.bestTimes),
+    };
+    const answer = await getAIService().chat(question, ctx);
+    return NextResponse.json({ answer });
+  } catch (err) {
+    // Log only the message (never the raw error object, which could leak
+    // secrets like API keys in stack traces) and return a generic 500.
+    console.error("Chat error:", err instanceof Error ? err.message : "unknown");
+    return NextResponse.json(
+      { error: "Error interno del asistente. Intentá de nuevo." },
+      { status: 500 },
+    );
+  }
 }

@@ -37,6 +37,12 @@ export function Shell({
 
   return (
     <div className="min-h-screen">
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[100] focus:rounded-[10px] focus:bg-[var(--accent)] focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-[var(--accent-fg)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50"
+      >
+        Saltar al contenido
+      </a>
       <header className="sticky top-0 z-50 glass">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-5">
           <Link
@@ -113,7 +119,13 @@ export function Shell({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-5 py-8">{children}</main>
+      <main
+        id="contenido"
+        tabIndex={-1}
+        className="mx-auto max-w-7xl px-5 py-8 focus:outline-none"
+      >
+        {children}
+      </main>
     </div>
   );
 }

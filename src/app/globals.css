@@ -102,3 +102,13 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Global keyboard focus indicator — a consistent, accessible focus ring for
+   every interactive element (links, buttons, inputs, controls). Components
+   that already opt into the accent ring keep it; this guarantees nothing
+   interactive is ever left without a visible focus state for keyboard users. */
+:where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}

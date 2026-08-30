@@ -18,21 +18,28 @@ import {
 import {
   resolveInstagramToken,
   isInstagramConfigured,
+  parseInstagramInsights,
+  fetchInstagramDailyMetrics,
 } from "../src/lib/connectors/instagram-logic.mjs";
 import { resolveAnthropicModel } from "../src/lib/ai/anthropic-logic.mjs";
 import { parseChatRequest, DEFAULT_CHAT_PLATFORM } from "../src/lib/ai/chat-request.mjs";
 
 let pass = 0;
 let fail = 0;
+const checks = [];
 function check(name, fn) {
-  try {
-    fn();
-    pass++;
-    console.log(`  ✔ ${name}`);
-  } catch (e) {
-    fail++;
-    console.error(`  ✖ ${name}\n    ${e.message}`);
-  }
+  checks.push(
+    (async () => {
+      try {
+        await fn();
+        pass++;
+        console.log(`  ✔ ${name}`);
+      } catch (e) {
+        fail++;
+        console.error(`  ✖ ${name}\n    ${e && e.message ? e.message : e}`);
+      }
+    })(),
+  );
 }
 
 console.log("Pulso analytics tests");
@@ -184,6 +191,94 @@ check("instagram: resolveInstagramToken trimea", () => {
   assert.equal(resolveInstagramToken({}), "");
 });
 
+// ─── Instagram daily metrics live parse (S2-1) ────────────────────────────
+const INSIGHTS_PAYLOAD = {
+  data: [
+    {
+      name: "reach",
+      period: "day",
+      values: [
+        { value: 100, end_time: "2024-01-01T08:00:00+0000" },
+        { value: 150, end_time: "2024-01-02T08:00:00+0000" },
+      ],
+    },
+    {
+      name: "impressions",
+      period: "day",
+      values: [
+        { value: 200, end_time: "2024-01-01T08:00:00+0000" },
+        { value: 300, end_time: "2024-01-02T08:00:00+0000" },
+      ],
+    },
+    {
+      name: "engagement",
+      period: "day",
+      values: [
+        { value: 10, end_time: "2024-01-01T08:00:00+0000" },
+        { value: 20, end_time: "2024-01-02T08:00:00+0000" },
+      ],
+    },
+  ],
+};
+
+check("instagram: parseInstagramInsights mergea reach/impressions/engagement por fecha", () => {
+  const daily = parseInstagramInsights(INSIGHTS_PAYLOAD);
+  assert.equal(daily.length, 2);
+  assert.equal(daily[0].date, "2024-01-01");
+  assert.equal(daily[0].reach, 100);
+  assert.equal(daily[0].impressions, 200);
+  assert.equal(daily[0].engagement, 10);
+  // followers/newFollowers/unfollows no vienen en insights básicos → 0
+  assert.equal(daily[0].followers, 0);
+  assert.equal(daily[0].newFollowers, 0);
+  assert.equal(daily[0].unfollows, 0);
+  assert.equal(daily[1].date, "2024-01-02");
+  assert.equal(daily[1].reach, 150);
+  assert.equal(daily[1].impressions, 300);
+  assert.equal(daily[1].engagement, 20);
+});
+
+check("instagram: parseInstagramInsights ordena por fecha asc", () => {
+  const daily = parseInstagramInsights(INSIGHTS_PAYLOAD);
+  assert.ok(daily[0].date < daily[1].date);
+});
+
+check("instagram: parseInstagramInsights lanza con payload malformado (→ fallback mock)", () => {
+  assert.throws(() => parseInstagramInsights(null));
+  assert.throws(() => parseInstagramInsights({}));
+  assert.throws(() => parseInstagramInsights({ data: [] }));
+  assert.throws(() => parseInstagramInsights({ data: [{ name: "reach", values: [] }] }));
+});
+
+check("instagram: fetchInstagramDailyMetrics devuelve DailyMetric[] con fetch OK", async () => {
+  const fakeFetch = async () => ({ ok: true, json: async () => INSIGHTS_PAYLOAD });
+  const res = await fetchInstagramDailyMetrics(fakeFetch, "tok_123", 90);
+  assert.ok(Array.isArray(res));
+  assert.equal(res.length, 2);
+  assert.equal(res[0].reach, 100);
+  assert.equal(res[1].engagement, 20);
+});
+
+check("instagram: fetchInstagramDailyMetrics → null (fallback) si fetch lanza", async () => {
+  const fakeFetch = async () => {
+    throw new Error("network");
+  };
+  const res = await fetchInstagramDailyMetrics(fakeFetch, "tok_123", 90);
+  assert.equal(res, null);
+});
+
+check("instagram: fetchInstagramDailyMetrics → null (fallback) si respuesta no ok", async () => {
+  const fakeFetch = async () => ({ ok: false, status: 401, json: async () => ({}) });
+  const res = await fetchInstagramDailyMetrics(fakeFetch, "tok_123", 90);
+  assert.equal(res, null);
+});
+
+check("instagram: fetchInstagramDailyMetrics → null (fallback) sin token", async () => {
+  const fakeFetch = async () => ({ ok: true, json: async () => INSIGHTS_PAYLOAD });
+  const res = await fetchInstagramDailyMetrics(fakeFetch, "", 90);
+  assert.equal(res, null);
+});
+
 // ─── Anthropic model resolution (B2) ─────────────────────────────────────
 check("anthropic: modelo default cuando no hay env", () => {
   assert.equal(resolveAnthropicModel({}), "claude-sonnet-4-6");
@@ -297,5 +392,6 @@ check("chat: body no-objeto (null/string) → error", () => {
   assert.equal(parseChatRequest("hola", PLATFORMS).ok, false);
 });
 
+await Promise.all(checks);
 console.log(`\n${pass} pass · ${fail} fail`);
 process.exit(fail ? 1 : 0);

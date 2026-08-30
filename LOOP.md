@@ -1,7 +1,7 @@
 # LOOP — Pulso: llevar a 100% funcional (hardening + mejoras)
 
-Status: Fases A-C completadas (D pendiente)
-Iteration: 1/5
+Status: Fases A-C completadas; Iteración 2 (S2-1..S2-7) completada; R2/R3/R4 completadas; D pendiente
+Iteration: 2/5
 Objective: Dejar Pulso 100% funcional y production-ready: build verde, typecheck
 verde, lint verde, tests verdes, app corriendo en dev y con las rutas/API clave
 respondiendo; auth y conectores en modo demo funcionando sin env vars; y
@@ -150,6 +150,25 @@ robustez, conectores live, validez de IA, UX, seguridad, performance y E2E.
   - Verify: `npm run verify` GREEN
   - Estado: done
 
+### Fase R4 — Ronda 4 EXEC: pulido post-verify (redirects 307 + dead code O2)
+- [x] R4-1 | dueño:@joaco | título: "Index pages base devuelven 307 (force-dynamic)"
+  - Entrada: `src/app/(app)/audit/page.tsx`, `best-time/page.tsx`, `hashtags/page.tsx`,
+    `competitors/page.tsx`, `ai/page.tsx` usan `redirect()` pero se prerenderizan estáticas y
+    se sirven 200 (defecto H-ITER2-1 / O3).
+  - Salida: `export const dynamic = "force-dynamic"` en cada una → el `redirect()` se ejecuta
+    en runtime y devuelve 307 a `/<ruta>/instagram`. Build OK (sin error de prerender).
+  - Verify: `npm run verify` GREEN (typecheck+lint+build+38/38 tests)
+  - Estado: done
+- [x] R4-2 | dueño:@joaco | título: "Dead code O2: rama inalcanzable en fetchInstagramDailyMetrics"
+  - Entrada: `src/lib/connectors/instagram-logic.mjs:97-98` — `if (parsed.length === 0) throw`
+    tras `parseInstagramInsights(json)`. `parseInstagramInsights` ya lanza si `byDate.size === 0`
+    (línea 57-59), por lo que `parsed` nunca es `[]` → rama inalcanzable (código muerto O2).
+  - Salida: se elimina la rama redundante; `parsed` sigue usándose en `return parsed`. La
+    validación de vacío queda centralizada en `parseInstagramInsights` (cubierta por tests de
+    malformed input). Sin pérdida de lógica útil.
+  - Verify: `npm run verify` GREEN (38/38); tests de `parseInstagramInsights`/`fetchInstagramDailyMetrics` intactos
+  - Estado: done
+
 ### Fase D — Verificación final end-to-end
 - [ ] D1 | dueño:@tester | título: "Verificación 100% funcional en demo (sin env)"
   - Entrada: todo lo anterior.
@@ -240,6 +259,45 @@ Fecha: 2026-08-29. Working tree sin commit (esperado en el loop). Server
 **VEREDICTO: 🟢 GREEN**
     - `verify` GREEN (31/31) + todas las rutas con status esperado
       (200/307/303) + sin secrets → cumple el contrato D1 al 100%.
+
+### TESTER — Veredicto Iteración 2 (S2-1..S2-7)
+
+Fecha: 2026-08-29. Working tree sin commit (esperado en el loop). Server `next start` en :3939 (modo demo, `env -i` sin env vars).
+
+**1. `npm run verify` (typecheck && lint && build && test) → ✅ GREEN**
+   - typecheck: ✅ 0 errores (`tsc --noEmit`, TS strict, exit 0)
+   - lint: ✅ 0 errores (`eslint .`)
+   - build: ✅ Next 16.3.3 (Turbopack) compila; 12 rutas generadas
+   - test: ✅ **38/38 pass · 0 fail** (subió de 31 → 38: +7 tests Instagram live parse/fallback)
+
+**2. Smoke runtime (demo, SIN env vars, `next start` :3939)**
+   - GET / → **200** ✅
+   - GET /dashboard → **200** ✅
+   - GET /audit → **200** ⚠️ (ESPERADO 307 → /audit/instagram; ver hallazgo H-ITER2-1)
+   - GET /audit/instagram → **200** ✅
+   - GET /competitors/instagram → **200** ✅
+   - GET /ruta-inexistente-xyz → **404** ✅ (not-found)
+   - POST /api/ai/chat `{message:"x"}` → **200** ✅ (mock demo válido)
+   - POST /api/ai/chat `{}` (sin campos) → **400** ✅ (`{"error":"Faltan question o message"}`, JSON controlado)
+   - POST /api/ai/chat body no-JSON (`not-json{`) → **400** ✅ (`{"error":"JSON inválido"}`, JSON controlado, SIN stack crudo)
+
+**3. Secrets → ✅ ninguno filtrado.**
+   - `git status`: working tree con modificaciones sin commitear (esperado).
+   - grep `sk-` / `ANTHROPIC_API_KEY=` en diff tracked → **0 coincidencias**.
+   - grep en archivos untracked nuevos (error.tsx, global-error.tsx, not-found.tsx, loading.tsx, empty-state.tsx) → **0 coincidencias**.
+
+**Hallazgo H-ITER2-1 (fuera de alcance S2):** `GET /audit` devuelve 200 en lugar de 307.
+Causa: `src/app/(app)/audit/page.tsx` hace `redirect("/audit/instagram")` pero `next build`
+(Turbopack) lo prerenderiza como página estática 200 (shell del layout, `x-nextjs-prerender:1`),
+perdiendo el redirect. `audit/page.tsx` NO está en el diff de S2 (último commit: `7bfc1b8`,
+Iter1), así que es un defecto PRE-EXISTENTE, no introducido por S2-1..S2-7. El contrato Iter1
+registró 307 (probablemente medido en `next dev`). Acción sugerida (fuera de S2): forzar dynamic
+(`export const dynamic = "force-dynamic"`) o mover el redirect a middleware. No bloquea S2.
+
+**VEREDICTO: 🟢 GREEN (alcance S2)**
+   - `verify` GREEN (38/38) + 8/9 smoke checks con status esperado + sin secrets.
+   - Única desviación: `/audit` 200≠307, defecto pre-existente documentado en H-ITER2-1
+     (no es regresión de S2). El demo en modo mock sigue 100% funcional sin env vars.
 
 ## Reflection
 - A1: `verify` encadena los 4 checks; ahora el baseline está "bloqueado" por script.
@@ -382,3 +440,145 @@ global de plataformas, manejo de errores, TS estricto, calidad de tests.
 - Modo demo confirmado funcional sin env vars (middleware y providers caen a
   mock/demo transparentemente). Esto cumple el objetivo de "auth y conectores
   en modo demo funcionando sin env vars".
+
+---
+
+## Iteración 2 — Mejoras de robustez, UX y cierre de deuda (PLANNER)
+
+**Estado de entrada (audit ITER 2):** `verify` GREEN — 31/31 tests pass, `tsc` OK, `eslint` OK, `next build` OK. Working tree clean (commit `45f9022`). Demo 100% funcional en mock sin env vars. TS estricto activo. Sin secrets en repo.
+
+**Deuda documentada en Reflection (Iter 1) abordada aquí:**
+- (1) `getDailyMetrics` devuelve mock aunque hay token → S2-1 (hacer live real con fallback).
+- (2) CSP `script-src` permisivo (`'unsafe-eval'`) → S2-2 (tensar en prod).
+- (3) E2E Playwright no hecho → ver veredicto al final (se recomienda POSPONER).
+
+**Reglas de esta iteración:** sin dependencias nuevas; TS estricto; modo demo intacto sin env vars; sin secrets; toda subtarea verificable por `@tester` con `npm run verify` GREEN + `npm run build` OK.
+
+### REVIEWER — Veredicto Iteración 2 (S2-1..S2-7)
+
+Fecha: 2026-08-29. Revisión del diff sin commitear (S2-1..S2-7) + archivos nuevos untracked.
+
+**S2-1 Instagram live (`instagram.ts`, `instagram-logic.mjs`): ✅**
+   - `getDailyMetrics` delega a `fetchInstagramDailyMetrics(fetch, token, days)` y hace
+     fallback a `super.getDailyMetrics` (mock) si devuelve `null`. Camino live limpio.
+   - `parseInstagramInsights`: valida `payload.data` array, itera métricas/valores con
+     guards (`!name`, `!Array.isArray`, `typeof value !== "number"`, `!end_time`); mergea
+     por fecha (`slice(0,10)`); lanza en payload malformado/vacío → fuerza fallback.
+   - `fetchInstagramDailyMetrics`: `null` si no hay token; `try/catch` devuelve `null` en
+     cualquier fallo (network/parse). **Sin `!` no-nulos frágiles** (todos los `!` son
+     guards defensivos `if (!x)`). Parseo y fallback correctos. ✅
+
+**S2-2 CSP condicional (`next.config.mjs`): ✅**
+   - `isProd = NODE_ENV==="production"`; en prod `script-src 'self' 'unsafe-inline'`
+     (sin `'unsafe-eval'`); en dev mantiene `'unsafe-eval'` para Fast Refresh. No rompe dev
+     (smoke corrió sobre build de prod y sirvió CSP correcto). ✅
+
+**S2-3 Error boundaries (`error.tsx`/`global-error.tsx`/`not-found.tsx`/`(app)/error.tsx`): ✅**
+   - `(app)/error.tsx`, `error.tsx` y `global-error.tsx` son `"use client"` (usan `useEffect`/
+     `reset`). `global-error.tsx` renderiza su propio `<html>/<body>` con estilos inline
+     (funciona aunque falle el CSS) → patrón correcto de root boundary. `not-found.tsx` y
+     `loading.tsx` son server components (no necesitan hooks). No rompen el layout: `(app)/error`
+     se renderiza DENTRO del Shell (mantiene nav). ✅
+
+**S2-4 Chat route try/catch (`api/ai/chat/route.ts`): ✅**
+   - Cuerpo post-parse envuelto en `try/catch`; en excepción `console.error(err.message)`
+     (NUNCA el objeto crudo → sin secrets en stack/trazas) y retorna
+     `NextResponse.json({error:"..."}, {status:500})`. Smoke: body malformado/vacío → 400
+     JSON controlado, sin stack crudo. ✅
+
+**S2-5 Loading/empty states: ✅**
+   - `(app)/loading.tsx`: skeleton coherente con el layout.
+   - `empty-state.tsx` usado en `audit` (daily vacío → sin chart), `best-time` (bestTimes
+     vacío → sin heatmap), `competitors` (sin competidores), `ai` (insights vacío). Coherentes. ✅
+
+**S2-6 A11y (`shell.tsx`, `globals.css`, `platform-icon.tsx`): ✅**
+   - Skip-link "Saltar al contenido" (`sr-only`→visible en foco) + `<main id="contenido"
+     tabIndex={-1}>`. `focus-visible` global en `globals.css` (outline accent). `PlatformIcon`
+     provee `aria-label` cuando no es `decorative` y `aria-hidden` cuando sí; nav usa texto
+     (sin botones solo-icono sin label). ✅
+
+**S2-7 Tests (38): ✅**
+   - +7 tests: `parseInstagramInsights` (merge por fecha + followers=0, orden asc, lanza en
+     malformado) y `fetchInstagramDailyMetrics` (happy fetch OK + fallback: fetch lanza /
+     respuesta no-ok / sin token). Cubren parse + fallback. Total 38/38. ✅
+
+**Observaciones menores (no bloqueantes):**
+   - O1: `fetchInstagramDailyMetrics` envía el token en el query string (`?access_token=`)
+     además del header `Bearer` (estándar de Meta Graph API). Aceptable, pero el token en
+     URL puede aparecer en logs de servidor; endurecer en prod si aplica.
+   - O2: `if (parsed.length === 0) throw ...` en `fetchInstagramDailyMetrics` es código muerto
+     (inalcanzable: `parseInstagramInsights` ya lanza si `byDate.size===0`). Inofensivo.
+   - O3: H-ITER2-1 (`/audit` 200≠307) es pre-existente y está fuera del alcance S2 (ver TESTER).
+
+**VEREDICTO: ✅ APPROVED**
+   - S2-1..S2-7 cumplen contrato: Instagram live con parseo defensivo + fallback a mock real,
+     CSP condicional sin romper dev, error boundaries correctos (client donde corresponde),
+     chat sin fuga de secrets, loading/empty coherentes, a11y (skip-link/focus-visible/aria),
+     38 tests verdes. Sin `!` frágiles, sin secrets, sin deps nuevas. Observaciones O1-O3
+     son cosméticas/no bloqueantes.
+
+### Subtarea S2-1 — Instagram `getDailyMetrics` live real (parseo de insights)
+- Dueño: @joaco
+- Entrada: `IG_USER_TOKEN` presente (`isInstagramConfigured()` true). Respuesta de `GET graph.instagram.com/me/insights?metric=reach,impressions,engagement&period=day&since=...`.
+- Salida esperada: cuando configurado y fetch OK, devolver `DailyMetric[]` parseado desde `data[].values` mergeando por `end_time`→`date` (mapear `reach`, `impressions`, `engagement`; `followers/newFollowers/unfollows` = 0, ya que esos no vienen en insights básicos). En cualquier fallo (`!res.ok`, JSON malformado, excepción de red) → `super.getDailyMetrics()` (mock). Mismo patrón de `getAccount()`. No romper el demo sin token.
+  - Verificación: `npm run verify` GREEN + nuevo test en `mcp/run-tests.mjs` que mockea `global.fetch` con payload de insights y afirma valores reales; y un test que con `fetch` que lanza, devuelve mock (fallback). Demo intacto sin `IG_USER_TOKEN`.
+  - Estado: done
+  - Nota @joaco: `getDailyMetrics` ahora llama `fetchInstagramDailyMetrics(fetch, token, days)` (pura, inyectable, testeable) en `instagram-logic.mjs`; parsea `reach/impressions/engagement` mergeando por `end_time`→`date`; `followers/newFollowers/unfollows=0` (no vienen en insights básicos). Cualquier fallo → `null` → `super.getDailyMetrics()` (mock). 7 tests nuevos cubren parse happy + fallback (fetch lanza / respuesta no-ok / sin token / payload malformado).
+
+### Subtarea S2-2 — CSP: tensar `script-src` en producción (quitar `'unsafe-eval'`)
+- Dueño: @joaco
+- Entrada: `next.config.mjs` `headers()` (CSP actual: `script-src 'self' 'unsafe-inline' 'unsafe-eval'`).
+- Salida esperada: ramificar por `process.env.NODE_ENV`. En `production`: `script-src 'self' 'unsafe-inline'` (sin `'unsafe-eval'`). En `development`: mantener `'unsafe-inline' 'unsafe-eval'` para Fast Refresh. Sin tocar otras directivas. Build debe pasar.
+  - Verificación: `npm run build` exit 0; `npm run verify` GREEN. (Nota: quitar también `'unsafe-inline'` requiere estrategia de nonce vía middleware — fuera de alcance, riesgo alto; postergar a Iter 3.)
+  - Estado: done
+  - Nota @joaco: `next.config.mjs` ramifica por `process.env.NODE_ENV`. Producción: `script-src 'self' 'unsafe-inline'` (sin `'unsafe-eval'`). Desarrollo: mantiene `'unsafe-eval'` para Fast Refresh. Otras directivas intactas.
+
+### Subtarea S2-3 — Error boundaries: `error.tsx` + `not-found.tsx` + `global-error.tsx`
+- Dueño: @joaco
+- Entrada: rutas `app/`; hoy sin boundary de error ni 404 custom (usa defaults de Next).
+- Salida esperada: crear `src/app/error.tsx` (client component, UI coherente con el design system, botón "Reintentar"), `src/app/not-found.tsx` (404 con link al dashboard), `src/app/global-error.tsx` (fallback raíz mínimo). No alterar el flujo demo.
+  - Verificación: `npm run verify` GREEN; `npm run build` OK. (Opcional: forzar un throw para ver el boundary en dev.)
+  - Estado: done
+  - Nota @joaco: creados `src/app/error.tsx` (root, client, botón "Reintentar" con `reset()`), `src/app/not-found.tsx` (404 → link a /dashboard), `src/app/global-error.tsx` (fallback raíz con su propio `<html>/<body>`, estilos inline), y `src/app/(app)/error.tsx` (boundary del segmento, dentro del Shell). UI coherente con tokens Apple-grade.
+
+### Subtarea S2-4 — Robustez de API: try/catch en chat route + 500 controlado
+- Dueño: @joaco
+- Entrada: `src/app/api/ai/chat/route.ts` (hoy sin try/catch alrededor de `analyze`/`chat`; un throw daría 500 crudo de Next).
+- Salida esperada: envolver el cuerpo post-parse en `try/catch`; en excepción devolver `NextResponse.json({ error: "..." }, { status: 500 })` y `console.error` del error (sin secrets en el mensaje). Mantener fallback a mock cuando no hay API key.
+  - Verificación: `npm run verify` GREEN; `npm run build` OK; test de que un body válido sigue dando 200 (ya cubierto por tests de chat-request).
+  - Estado: done
+  - Nota @joaco: `route.ts` envuelve el cuerpo post-parse en `try/catch`; en excepción devuelve `NextResponse.json({ error: "..." }, { status: 500 })` y `console.error(err.message)` (nunca el objeto crudo → sin secrets en log). Fallback a mock de IA preservado.
+
+### Subtarea S2-5 — Loading/empty states en páginas de detalle `[platform]`
+- Dueño: @joaco
+- Entrada: `audit/[platform]`, `best-time/[platform]`, `hashtags/[platform]`, `ai/[platform]`; hoy siempre pobladas (mock) pero sin `loading.tsx` ni empty state si el análisis viene vacío (caso conector real).
+- Salida esperada: agregar `loading.tsx` (skeleton) al segmento `(app)` y empty states cuando `analysis.daily/posts/hashtags` estén vacíos. Solo UI; no toca lógica de mock ni conectores.
+  - Verificación: `npm run verify` GREEN; `npm run build` OK.
+  - Estado: done
+  - Nota @joaco: creado `src/app/(app)/loading.tsx` (skeleton coherente). Empty states vía nuevo `src/components/ui/empty-state.tsx` en `audit` (daily vacío → sin chart), `best-time` (bestTimes vacío → sin heatmap), `competitors` (sin competidores → nota), `ai` (insights vacío). `hashtags` ya tenía empty state. No se tocó lógica de mock/conectores.
+
+### Subtarea S2-6 — Accesibilidad restante (focus-visible, skip-link, aria en controles)
+- Dueño: @joaco
+- Entrada: `shell.tsx` (nav ya usa `aria-current`), `platform-switcher.tsx`, `chat-panel.tsx`, botones icono; `globals.css`.
+- Salida esperada: skip-to-content link en layout `(app)`; `focus-visible` ring global en `globals.css`; `aria-label` en botones/iconos sin texto; roles/`nav` adecuados. Sin cambiar el look salvo el focus ring.
+  - Verificación: `npm run verify` GREEN; `npm run build` OK; revisión manual de foco/contraste.
+  - Estado: done
+  - Nota @joaco: skip-link "Saltar al contenido" en `Shell` (primer elemento focuseable, `sr-only`→visible en foco) + `id="contenido"`/`tabIndex={-1}` en `<main>`. `focus-visible` global en `globals.css` (`:where(a,button,input,select,textarea,[role=button],[tabindex]):focus-visible` → outline accent). Verificado: no hay controles solo-icono sin `aria-label` (todos los botones tienen texto; `PlatformIcon` provee `aria-label` cuando no es `decorative`).
+
+### Subtarea S2-7 — Tests adicionales (cobertura de los nuevos caminos)
+- Dueño: @joaco
+- Entrada: `mcp/run-tests.mjs` (runner sin deps).
+- Salida esperada: tests para S2-1 (parse de insights + fallback en fallo) y, si aplica, `getAccount` live; mantener todos los tests previos. Conteo de tests sube (31 → 31+N) y sigue GREEN.
+  - Verificación: `npm run verify` GREEN; el conteo de tests aumenta.
+  - Estado: done
+  - Nota @joaco: 7 tests nuevos en `mcp/run-tests.mjs` (runner sin deps, ahora soporta async vía `await Promise.all(checks)`): `parseInstagramInsights` happy (merge por fecha + followers=0) + orden asc + lanza en payload malformado; `fetchInstagramDailyMetrics` happy (fetch OK) + fallback (fetch lanza / respuesta no-ok / sin token). Total: **38/38** (subió de 31).
+
+### Veredicto E2E Playwright (Iter 2)
+**Recomendación: POSPONER.** Razones:
+- Dep pesada (Chromium ~150–300 MB) y config de CI que el demo no justifica hoy.
+- El demo corre 100% en MockConnector: no hay backend real que afirmar, así que un E2E solo ejercitaría la UI sobre datos mock (bajo valor marginal).
+- La lógica de conectores/AI/MCP ya está cubierta por 31 tests unitarios; `npm run verify` ya incluye `next build` (smoke de compilación/RSC).
+- Aportaría valor real recién con backend real (Supabase + `IG_USER_TOKEN`) o en CI con presupuesto. Alternativa ligera: un test de integración del route handler `/api/ai/chat` con el runner actual (sin navegador). Postergar E2E a Iter 3+ o hasta tener backend real.
+
+### Criterio de "listo" (Iter 2)
+`npm run verify` GREEN (tsc + eslint + build + 31+N tests) + `@reviewer` APPROVED + demo intacto sin env vars (modo mock funcional) + sin secrets nuevos + sin dependencias nuevas.

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PlatformSwitcher } from "@/components/platform-switcher";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { getProvider } from "@/lib/data/provider";
@@ -93,6 +94,14 @@ export default async function CompetitorsPage({
           </tbody>
         </table>
       </Card>
+
+      {competitors.length === 0 && (
+        <EmptyState
+          title="Sin competidores para comparar"
+          hint="Aún no hay cuentas de la competencia en este nicho."
+          className="mt-4"
+        />
+      )}
     </div>
   );
 }

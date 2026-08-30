@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PlatformSwitcher } from "@/components/platform-switcher";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { Heatmap } from "@/components/ui/heatmap";
 import { getProvider } from "@/lib/data/provider";
@@ -33,12 +34,14 @@ export default async function BestTimePage({
         </div>
       </div>
 
-      <Card className="mt-8">
-        <Heatmap cells={analysis.bestTimes} />
-      </Card>
+      {analysis.bestTimes.length > 0 ? (
+        <>
+          <Card className="mt-8">
+            <Heatmap cells={analysis.bestTimes} />
+          </Card>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {top.map((c, i) => (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {top.map((c, i) => (
           <Card key={i} className="flex items-center justify-between">
             <div>
               <p className="font-semibold">{DAY_NAMES[c.day]}</p>
@@ -55,6 +58,14 @@ export default async function BestTimePage({
       <p className="mt-4 text-sm text-[var(--muted)]">
         Resumen: {bestTimeSummary(analysis.bestTimes)}
       </p>
+        </>
+      ) : (
+        <EmptyState
+          title="Sin datos de actividad"
+          hint="Conectá la cuenta para descubrir tu mejor horario."
+          className="mt-8"
+        />
+      )}
     </div>
   );
 }

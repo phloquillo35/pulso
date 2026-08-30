@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PlatformSwitcher } from "@/components/platform-switcher";
 import { Card, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { AreaChart } from "@/components/ui/charts";
@@ -49,7 +50,15 @@ export default async function AuditPage({
           <p className="mt-2 text-6xl font-semibold tracking-tight">{audit.overall}</p>
           <p className="text-[var(--muted)]">/ 100 · grado {audit.grade}</p>
           <div className="mt-4 w-full">
-            <AreaChart data={followersSeries.slice(-30)} height={90} />
+            {daily.length > 0 ? (
+              <AreaChart data={followersSeries.slice(-30)} height={90} />
+            ) : (
+              <EmptyState
+                title="Sin datos diarios"
+                hint="Conectá la cuenta para ver la evolución de seguidores."
+                className="h-[90px]"
+              />
+            )}
           </div>
         </Card>
 

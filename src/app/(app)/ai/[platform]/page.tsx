@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PlatformSwitcher } from "@/components/platform-switcher";
 import { Card, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { ChatPanel } from "@/components/chat-panel";
@@ -62,21 +63,28 @@ export default async function AIPage({
         <Card>
           <CardTitle>Insights detectados (datos)</CardTitle>
           <div className="mt-3 space-y-2">
-            {analysis.insights.map((ins) => (
-              <div key={ins.id} className="flex gap-3 text-sm">
-                <Badge
-                  tone={
-                    ins.kind === "win" ? "success" : ins.kind === "risk" ? "danger" : ins.kind === "anomaly" ? "warning" : "accent"
-                  }
-                >
-                  {ins.kind}
-                </Badge>
-                <div>
-                  <p className="font-medium">{ins.title}</p>
-                  <p className="text-[var(--muted)]">{ins.detail}</p>
+            {analysis.insights.length > 0 ? (
+              analysis.insights.map((ins) => (
+                <div key={ins.id} className="flex gap-3 text-sm">
+                  <Badge
+                    tone={
+                      ins.kind === "win" ? "success" : ins.kind === "risk" ? "danger" : ins.kind === "anomaly" ? "warning" : "accent"
+                    }
+                  >
+                    {ins.kind}
+                  </Badge>
+                  <div>
+                    <p className="font-medium">{ins.title}</p>
+                    <p className="text-[var(--muted)]">{ins.detail}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <EmptyState
+                title="Sin insights detectados"
+                hint="Conectá la cuenta para que la IA encuentre patrones."
+              />
+            )}
           </div>
         </Card>
 
