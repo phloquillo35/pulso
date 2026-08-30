@@ -11,6 +11,8 @@ import {
 } from "./server.mjs";
 import {
   parseFacetsToHashtags,
+  deriveMediaType,
+  mapFeedItemToPost,
   mapFeedToPosts,
   computeDailyMetricsFromPosts,
   computeHashtagStats as computeHashtagStatsBsky,
@@ -174,6 +176,86 @@ check("bluesky: computeHashtagStats ordena por engagement desc", () => {
   assert.equal(stats[0].tag, "b");
   assert.equal(stats.find((s) => s.tag === "a").uses, 2);
   assert.ok(stats[0].avgEngagement >= stats[1].avgEngagement);
+});
+
+// ─── I5-2: cobertura adicional de bluesky-logic.mjs (sin I/O de red) ───────
+check("bluesky: deriveMediaType mapea embed → MediaType", () => {
+  assert.equal(deriveMediaType({ $type: "app.bsky.embed.images#images" }), "image");
+  assert.equal(deriveMediaType({ $type: "app.bsky.embed.video#video" }), "video");
+  assert.equal(deriveMediaType({ $type: "app.bsky.embed.external" }), "text");
+  assert.equal(deriveMediaType(undefined), "text");
+  assert.equal(deriveMediaType(null), "text");
+});
+
+check("bluesky: mapFeedItemToPost calcula engagementRate y url con rkey/handle", () => {
+  const item = {
+    post: {
+      uri: "at://did:plc:z/app.bsky.feed.post/xyz789",
+      likeCount: 20,
+      replyCount: 4,
+      repostCount: 6,
+      quoteCount: 2,
+      author: { handle: "ana.bsky.social" },
+      record: { text: "Hola #hola", createdAt: RECENT_ISO, facets: [] },
+    },
+  };
+  const p = mapFeedItemToPost(item, {
+    accountId: "acc_bsky",
+    platform: "bluesky",
+    followers: 1000,
+    handle: "ana.bsky.social",
+  });
+  // engagement = 20+4+6+2 = 32; rate = 32/1000
+  assert.ok(Math.abs(p.metrics.engagementRate - 32 / 1000) < 1e-9);
+  assert.equal(p.metrics.likes, 20);
+  assert.equal(p.metrics.comments, 4);
+  assert.equal(p.metrics.shares, 6);
+  assert.equal(p.metrics.saves, 2);
+  assert.equal(p.url, "https://bsky.app/profile/ana.bsky.social/post/xyz789");
+  assert.equal(p.mediaType, "text");
+  assert.deepEqual(p.hashtags, ["hola"]);
+});
+
+check("bluesky: mapFeedItemToPost sin followers → engagementRate 0", () => {
+  const item = { post: { uri: "at://x/y", likeCount: 10, record: { text: "x" } } };
+  const p = mapFeedItemToPost(item, { accountId: "a", platform: "bluesky", followers: 0 });
+  assert.equal(p.metrics.engagementRate, 0);
+});
+
+check("bluesky: mapFeedItemToPost sin uri → id fallback y url undefined", () => {
+  const item = { post: { record: { text: "x" } } };
+  const p = mapFeedItemToPost(item, { accountId: "a", platform: "bluesky", followers: 0 });
+  assert.ok(p.id.startsWith("a_"));
+  assert.equal(p.url, undefined);
+});
+
+check("bluesky: mapFeedToPosts con feed no-array → []", () => {
+  const ctx = { accountId: "a", platform: "bluesky", followers: 0 };
+  assert.deepEqual(mapFeedToPosts(null, ctx), []);
+  assert.deepEqual(mapFeedToPosts(undefined, ctx), []);
+  assert.deepEqual(mapFeedToPosts("no-es-array", ctx), []);
+});
+
+check("bluesky: parseFacetsToHashtags borde (sin facets ni texto) → []", () => {
+  assert.deepEqual(parseFacetsToHashtags(undefined, undefined), []);
+  assert.deepEqual(parseFacetsToHashtags([], ""), []);
+  // dedup: mismo tag vía facets y vía texto → una sola entrada
+  const tags = parseFacetsToHashtags(
+    [{ features: [{ $type: "app.bsky.richtext.facet#tag", tag: "Dup" }] }],
+    "#dup",
+  );
+  assert.deepEqual(tags, ["dup"]);
+});
+
+check("bluesky: computeDailyMetricsFromPosts con posts vacíos → días con engagement 0", () => {
+  const daily = computeDailyMetricsFromPosts([], { days: 30, followers: 100 });
+  assert.equal(daily.length, 30);
+  assert.ok(daily.every((d) => d.engagement === 0 && d.followers === 100));
+});
+
+check("bluesky: computeHashtagStats con posts vacíos → []", () => {
+  assert.deepEqual(computeHashtagStatsBsky([]), []);
+  assert.deepEqual(computeHashtagStatsBsky(undefined), []);
 });
 
 // ─── Instagram connector logic (B1) ───────────────────────────────────────

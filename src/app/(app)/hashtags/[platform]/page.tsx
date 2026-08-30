@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PlatformSwitcher } from "@/components/platform-switcher";
 import { Card, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { getProvider } from "@/lib/data/provider";
 import { PLATFORMS, PLATFORM_LABEL, type Platform } from "@/lib/types";
@@ -50,7 +51,10 @@ export default async function HashtagsPage({
             </div>
           ))}
           {analysis.hashtags.length === 0 && (
-            <p className="text-sm text-[var(--muted)]">Sin hashtags detectados.</p>
+            <EmptyState
+              title="Sin hashtags detectados"
+              hint="Conectá la cuenta para ver qué etiquetas mueven engagement."
+            />
           )}
         </div>
       </Card>

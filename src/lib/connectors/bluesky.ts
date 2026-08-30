@@ -17,6 +17,17 @@ export class BlueskyConnector extends BaseConnector {
   private identifier = process.env.BLUESKY_IDENTIFIER;
   private appPassword = process.env.BLUESKY_APP_PASSWORD;
 
+  // ─── In-instance caches (one auth + one feed per analyze) ────────────────
+  // `analyze()` runs getAccount + getDailyMetrics + getPosts + getHashtags in
+  // parallel. Without caching that means 4 createSession + 3 getAuthorFeed calls
+  // against Bluesky's strict rate limits. We cache the JWT and the feed on the
+  // instance (a fresh connector is built per analyze) and dedupe in-flight
+  // promises so parallel callers share a single network round-trip each.
+  private jwt: string | null = null;
+  private authInFlight: Promise<string | null> | null = null;
+  private feedCache: Post[] | null = null;
+  private feedInFlight: Promise<Post[]> | null = null;
+
   constructor() {
     super("bluesky");
   }
@@ -25,7 +36,14 @@ export class BlueskyConnector extends BaseConnector {
     return Boolean(this.identifier && this.appPassword);
   }
 
-  private async authenticate(): Promise<string | null> {
+  private authenticate(): Promise<string | null> {
+    if (this.jwt) return Promise.resolve(this.jwt);
+    if (this.authInFlight) return this.authInFlight;
+    this.authInFlight = this.doAuthenticate();
+    return this.authInFlight;
+  }
+
+  private async doAuthenticate(): Promise<string | null> {
     try {
       const res = await fetchWithTimeout(`${HOST}/com.atproto.server.createSession`, {
         method: "POST",
@@ -35,9 +53,16 @@ export class BlueskyConnector extends BaseConnector {
           password: this.appPassword,
         }),
       });
+      if (res.status === 429) {
+        console.warn(
+          `[bluesky] rate-limited (429) on createSession for ${this.identifier}; falling back to mock.`,
+        );
+        return null;
+      }
       if (!res.ok) return null;
       const d = await res.json();
-      return d.accessJwt as string;
+      this.jwt = (d.accessJwt as string) || null;
+      return this.jwt;
     } catch {
       return null;
     }
@@ -52,6 +77,12 @@ export class BlueskyConnector extends BaseConnector {
         `${HOST}/app.bsky.actor.getProfile?actor=${encodeURIComponent(this.identifier!)}`,
         { headers: { Authorization: `Bearer ${jwt}` } },
       );
+      if (res.status === 429) {
+        console.warn(
+          `[bluesky] rate-limited (429) on getProfile for ${this.identifier}; falling back to mock.`,
+        );
+        return super.getAccount();
+      }
       if (!res.ok) throw new Error(`bsky ${res.status}`);
       const d = await res.json();
       const base = await super.getAccount();
@@ -69,27 +100,42 @@ export class BlueskyConnector extends BaseConnector {
   }
 
   // ─── Live feed (getAuthorFeed) ──────────────────────────────────────────
-  private async fetchFeed(accountId: string, limit: number): Promise<Post[]> {
+  private fetchFeed(accountId: string, limit: number): Promise<Post[]> {
+    if (this.feedCache) return Promise.resolve(this.feedCache.slice(0, limit));
+    if (this.feedInFlight) return this.feedInFlight.then((p) => p.slice(0, limit));
+    this.feedInFlight = this.doFetchFeed(accountId);
+    return this.feedInFlight.then((p) => p.slice(0, limit));
+  }
+
+  private async doFetchFeed(accountId: string): Promise<Post[]> {
     const jwt = await this.authenticate();
-    if (!jwt) return super.getPosts(accountId, limit);
+    if (!jwt) return super.getPosts(accountId, 100);
     try {
       const res = await fetchWithTimeout(
         `${HOST}/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(
           this.identifier!,
-        )}&limit=${Math.min(limit, 100)}`,
+        )}&limit=100`,
         { headers: { Authorization: `Bearer ${jwt}` } },
       );
+      if (res.status === 429) {
+        console.warn(
+          `[bluesky] rate-limited (429) on getAuthorFeed for ${this.identifier}; falling back to mock.`,
+        );
+        return super.getPosts(accountId, 100);
+      }
       if (!res.ok) throw new Error(`bsky feed ${res.status}`);
       const d = await res.json();
       const account = await super.getAccount();
-      return mapFeedToPosts(d.feed ?? [], {
+      const posts = mapFeedToPosts(d.feed ?? [], {
         accountId,
         platform: this.platform,
         followers: account.followers,
         handle: this.identifier!,
-      }).slice(0, limit) as Post[];
+      }) as Post[];
+      this.feedCache = posts;
+      return posts;
     } catch {
-      return super.getPosts(accountId, limit);
+      return super.getPosts(accountId, 100);
     }
   }
 
