@@ -1,22 +1,23 @@
 # AGENTS.md (Workflow Context) — pulso
-> Generado: 2026-08-29 21:24:05 · Herramienta: opencode · Proyecto: /Users/pablohernandezcanelo/Documents/pulso
+> Generado: 2026-08-29 21:56:38 · Herramienta: opencode · Proyecto: /Users/pablohernandezcanelo/Documents/pulso
 
 ## 🎯 Objetivo actual
-Pulso iter2: instagram live, CSP, error boundaries, a11y, 38/38 tests, redirects 307
+Pulso iter3: CSP, timeouts, a11y foco, IG Bearer, auth callback, tipos Supabase, MCP hardening, 44/44 tests
 
 ## 📍 Estado actual
   Branch: main · Working tree: SUCIO (1 archivos)
 
   Cambios sin commit:
-   AGENTS.md | 80 ++-------------------------------------------------------------
-   1 file changed, 2 insertions(+), 78 deletions(-)
+   AGENTS.md | 82 ++-------------------------------------------------------------
+   1 file changed, 2 insertions(+), 80 deletions(-)
    M AGENTS.md
 
   Últimos commits:
+  18bf765 feat(iter3): CSP Supabase, timeouts, focus unify, IG Bearer, auth callback, typed rows, asPlatform, MCP hardening
+  0ed7c5b docs: AGENTS.md handoff iter2
   a6c984f feat(iter2): instagram live metrics, CSP, error boundaries, a11y, loading/empty states
   45f9022 docs: AGENTS.md handoff (estado 100% funcional)
   7bfc1b8 fix/feat: audit + hardening + UX (loop maestro)
-  8df3507 feat: initial Pulso scaffold (Next16+React19+TS+Tailwind v4, AI layer, social connectors, Supabase, MCP server)
 
 ## ✅ Tareas activas
   (sin tareas activas)
@@ -85,4 +86,4 @@ tsconfig.tsbuildinfo
     typecheck: npx tsc --noEmit
 
 ## 🧠 Decisiones tomadas
-      _(decisiones de diseño/acuerdo a registrar aquí)_
+        _(decisiones de diseño/acuerdo a registrar aquí)_
