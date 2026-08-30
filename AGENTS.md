@@ -1,8 +1,8 @@
 # AGENTS.md (Workflow Context) — pulso
-> Generado: 2026-08-29 22:44:51 · Herramienta: opencode · Proyecto: /Users/pablohernandezcanelo/Documents/pulso
+> Generado: 2026-08-29 22:47:35 · Herramienta: opencode · Proyecto: /Users/pablohernandezcanelo/Documents/pulso
 
 ## 🎯 Objetivo actual
-Pulso iter5: cache Bluesky, warn 429, +8 tests bluesky-logic, empty state, 54/54
+Recuperación y puesta a punto de Pulso: repo inicializado y pusheado a GitHub (phloquillo35/pulso). 5 iteraciones del loop MAESTRO (hardening+UX, Instagram live, CSP, error boundaries, a11y, timeouts, auth callback/logout, tipos Supabase, MCP hardening, cacheo Bluesky, fix cold-start y open-redirect). 54/54 tests verdes. Deploy a Vercel producción (pulso-gules-eight.vercel.app).
 
 ## 📍 Estado actual
   Branch: main · Working tree: SUCIO (1 archivos)
@@ -13,11 +13,11 @@ Pulso iter5: cache Bluesky, warn 429, +8 tests bluesky-logic, empty state, 54/54
    M AGENTS.md
 
   Últimos commits:
+  eb115db docs: AGENTS.md handoff iter5
   0003b63 perf(iter5): cache Bluesky JWT+feed, warn 429, +8 tests, hashtags empty state
   5fe04f7 docs: AGENTS.md handoff iter4
   85aeb76 fix(iter4): cold-start 400, chat error UI, logout origin, callback open-redirect
   dc8c397 docs: AGENTS.md handoff iter3
-  18bf765 feat(iter3): CSP Supabase, timeouts, focus unify, IG Bearer, auth callback, typed rows, asPlatform, MCP hardening
 
 ## ✅ Tareas activas
   (sin tareas activas)
@@ -86,4 +86,4 @@ tsconfig.tsbuildinfo
     typecheck: npx tsc --noEmit
 
 ## 🧠 Decisiones tomadas
-            _(decisiones de diseño/acuerdo a registrar aquí)_
+              _(decisiones de diseño/acuerdo a registrar aquí)_
